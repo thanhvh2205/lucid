@@ -361,7 +361,7 @@ export class Lucid {
                     : { poolId: null, rewards: 0n };
             },
             signTx: async (tx) => {
-                const utxos = await this.utxosAt(address);
+                const utxos = await this.utxosAt(paymentCredentialOf(address));
                 const ownKeyHashes = [paymentKeyHash, stakeKeyHash];
                 const usedKeyHashes = discoverOwnUsedTxKeyHashes(tx, ownKeyHashes, utxos);
                 const txWitnessSetBuilder = C.TransactionWitnessSetBuilder.new();
