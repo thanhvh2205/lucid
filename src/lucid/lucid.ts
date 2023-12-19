@@ -76,7 +76,7 @@ export class Lucid {
           ),
         )
         .key_deposit(
-          C.BigNum.from_str(protocolParameters.keyDeposit.toString()),
+          C.BigNum.from_str('2000000'),
         )
         .pool_deposit(
           C.BigNum.from_str(protocolParameters.poolDeposit.toString()),
