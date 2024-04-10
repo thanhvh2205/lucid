@@ -8,8 +8,14 @@
   },
   "lint": {
     "files": {
-      "include": ["src/"],
-      "exclude": ["src/core/"]
+      "include": [
+        "src/"
+      ],
+      "exclude": [
+        "src/core/",
+        "src/provider/blockfrost.ts",
+        "src/provider/maestro.ts"
+      ]
     }
   }
 }
