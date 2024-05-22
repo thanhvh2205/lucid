@@ -20,14 +20,18 @@ import { fromHex, fromUnit, toHex } from "../utils/mod.ts";
 export class Kupmios implements Provider {
   kupoUrl: string;
   ogmiosUrl: string;
+  url: string;
+  projectId: string;
 
   /**
    * @param kupoUrl: http(s)://localhost:1442
    * @param ogmiosUrl: ws(s)://localhost:1337
    */
-  constructor(kupoUrl: string, ogmiosUrl: string) {
+  constructor(kupoUrl: string, ogmiosUrl: string, url?: string, projectId?: string) {
     this.kupoUrl = kupoUrl;
     this.ogmiosUrl = ogmiosUrl;
+    this.url = url || "";
+    this.projectId = projectId || "";
   }
 
   async getProtocolParameters(): Promise<ProtocolParameters> {
