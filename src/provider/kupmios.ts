@@ -31,9 +31,7 @@ export class Kupmios implements Provider {
   }
 
   async getProtocolParameters(): Promise<ProtocolParameters> {
-    const client = await this.ogmiosWsp("Query", {
-      query: "currentProtocolParameters",
-    });
+    const client = await this.ogmiosWsp("queryLedgerState/protocolParameters", {});
 
     return new Promise((res, rej) => {
       client.addEventListener("message", (msg: MessageEvent<string>) => {
@@ -42,29 +40,29 @@ export class Kupmios implements Provider {
 
           // deno-lint-ignore no-explicit-any
           const costModels: any = {};
-          Object.keys(result.costModels).forEach((v) => {
+          Object.keys(result.plutusCostModels).forEach((v) => {
             const version = v.split(":")[1].toUpperCase();
             const plutusVersion = "Plutus" + version;
-            costModels[plutusVersion] = result.costModels[v];
+            costModels[plutusVersion] = result.plutusCostModels[v];
           });
-          const [memNum, memDenom] = result.prices.memory.split("/");
-          const [stepsNum, stepsDenom] = result.prices.steps.split("/");
+          const [memNum, memDenom] = result.scriptExecutionPrices.memory.split("/");
+          const [cpuNum, cpuDenom] = result.scriptExecutionPrices.cpu.split("/");
 
           res(
             {
               minFeeA: parseInt(result.minFeeCoefficient),
-              minFeeB: parseInt(result.minFeeConstant),
-              maxTxSize: parseInt(result.maxTxSize),
-              maxValSize: parseInt(result.maxValueSize),
-              keyDeposit: BigInt(result.stakeKeyDeposit),
-              poolDeposit: BigInt(result.poolDeposit),
+              minFeeB: parseInt(result.minFeeConstant.ada.lovelace),
+              maxTxSize: parseInt(result.maxTransactionSize.bytes),
+              maxValSize: parseInt(result.maxValueSize.bytes),
+              keyDeposit: BigInt(result.stakeCredentialDeposit.ada.lovelace),
+              poolDeposit: BigInt(result.stakePoolDeposit.ada.lovelace),
               priceMem: parseInt(memNum) / parseInt(memDenom),
-              priceStep: parseInt(stepsNum) / parseInt(stepsDenom),
+              priceStep: parseInt(cpuNum) / parseInt(cpuDenom),
               maxTxExMem: BigInt(result.maxExecutionUnitsPerTransaction.memory),
               maxTxExSteps: BigInt(
-                result.maxExecutionUnitsPerTransaction.steps,
+                result.maxExecutionUnitsPerTransaction.cpu,
               ),
-              coinsPerUtxoByte: BigInt(result.coinsPerUtxoByte),
+              coinsPerUtxoByte: BigInt(result.minUtxoDepositCoefficient),
               collateralPercentage: parseInt(result.collateralPercentage),
               maxCollateralInputs: parseInt(result.maxCollateralInputs),
               costModels,
@@ -148,8 +146,8 @@ export class Kupmios implements Provider {
   }
 
   async getDelegation(rewardAddress: RewardAddress): Promise<Delegation> {
-    const client = await this.ogmiosWsp("Query", {
-      query: { "delegationsAndRewards": [rewardAddress] },
+    const client = await this.ogmiosWsp("queryLedgerState/rewardAccountSummaries", {
+      keys: [rewardAddress],
     });
 
     return new Promise((res, rej) => {
@@ -200,8 +198,8 @@ export class Kupmios implements Provider {
   }
 
   async submitTx(tx: Transaction): Promise<TxHash> {
-    const client = await this.ogmiosWsp("SubmitTx", {
-      submit: tx,
+    const client = await this.ogmiosWsp("submitTransaction", {
+      transaction: { cbor: tx },
     });
 
     return new Promise((res, rej) => {
@@ -209,8 +207,28 @@ export class Kupmios implements Provider {
         try {
           const { result } = JSON.parse(msg.data);
 
-          if (result.SubmitSuccess) res(result.SubmitSuccess.txId);
-          else rej(result.SubmitFail);
+          if (result.result) res(result.result.transaction.id);
+          else rej(result.error);
+          client.close();
+        } catch (e) {
+          rej(e);
+        }
+      }, { once: true });
+    });
+  }
+
+  async EvaluateTx(tx: Transaction): Promise<any> {
+    const client = await this.ogmiosWsp("evaluateTransaction", {
+      transaction: { cbor: tx },
+    });
+
+    return new Promise((res, rej) => {
+      client.addEventListener("message", (msg: MessageEvent<string>) => {
+        try {
+          const { result } = JSON.parse(msg.data);
+
+          if (result.result) res(result);
+          else rej(result.error);
           client.close();
         } catch (e) {
           rej(e);
@@ -265,19 +283,17 @@ export class Kupmios implements Provider {
   }
 
   private async ogmiosWsp(
-    methodname: string,
-    args: unknown,
+    method: string,
+    params: unknown,
   ): Promise<WebSocket> {
     const client = new WebSocket(this.ogmiosUrl);
     await new Promise((res) => {
       client.addEventListener("open", () => res(1), { once: true });
     });
     client.send(JSON.stringify({
-      type: "jsonwsp/request",
-      version: "1.0",
-      servicename: "ogmios",
-      methodname,
-      args,
+      jsonrpc: "2.0",
+      method,
+      params,
     }));
     return client;
   }
